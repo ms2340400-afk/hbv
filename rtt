@@ -1,29 +1,22 @@
--- Auto Buy Upgrades UI
--- Put this LocalScript in StarterGui or StarterPlayerScripts
-
+-- Auto Buy / Action UI
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Remote event path
 local remote = ReplicatedStorage:WaitForChild("NetRemotes"):WaitForChild("Event")
 
--- Upgrades to auto-buy
-local upgrades = {
-    "CashMultiplier",
-    "AttackRange",
-    "SpawnType",
+local actions = {
+	{ label = "CashMultiplier", args = {"BuyUpgrade", "CashMultiplier"} },
+	{ label = "AttackRange",    args = {"BuyUpgrade", "AttackRange"} },
+	{ label = "SpawnType",      args = {"BuyUpgrade", "SpawnType"} },
+	{ label = "DoRebirth",      args = {"DoRebirth"} },
 }
 
--- Auto-buy interval (seconds between each purchase attempt)
 local INTERVAL = 1
+local enabled = {}
 
--- Toggle states
-local buyingEnabled = {}
-
--- UI Setup
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoBuyUI"
 screenGui.ResetOnSpawn = false
@@ -32,75 +25,69 @@ screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 180)
-frame.Position = UDim2.new(0.5, -110, 0.5, -90)
+frame.Size = UDim2.new(0, 240, 0, 200)
+frame.Position = UDim2.new(0.5, -120, 0.5, -100)
 frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
--- Corner
 local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = frame
 
--- Title
 local title = Instance.new("TextLabel")
-title.Name = "Title"
 title.Size = UDim2.new(1, 0, 0, 30)
 title.Position = UDim2.new(0, 0, 0, 5)
 title.BackgroundTransparency = 1
-title.Text = "Auto Buy Upgrades"
+title.Text = "Auto Buy / Actions"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = frame
 
--- Create toggle buttons
 local yPos = 40
-for _, upgradeName in ipairs(upgrades) do
-    buyingEnabled[upgradeName] = false
+for _, action in ipairs(actions) do
+	enabled[action.label] = false
 
-    local button = Instance.new("TextButton")
-    button.Name = upgradeName .. "Button"
-    button.Size = UDim2.new(1, -20, 0, 35)
-    button.Position = UDim2.new(0, 10, 0, yPos)
-    button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    button.Text = upgradeName .. " Auto-Buy: OFF"
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.TextScaled = true
-    button.Font = Enum.Font.GothamMedium
-    button.AutoButtonColor = false
-    button.Parent = frame
+	local button = Instance.new("TextButton")
+	button.Name = action.label .. "Button"
+	button.Size = UDim2.new(1, -20, 0, 35)
+	button.Position = UDim2.new(0, 10, 0, yPos)
+	button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+	button.Text = action.label .. " Auto: OFF"
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.TextScaled = true
+	button.Font = Enum.Font.GothamMedium
+	button.AutoButtonColor = false
+	button.Parent = frame
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = button
 
-    button.MouseButton1Click:Connect(function()
-        buyingEnabled[upgradeName] = not buyingEnabled[upgradeName]
-        if buyingEnabled[upgradeName] then
-            button.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-            button.Text = upgradeName .. " Auto-Buy: ON"
-        else
-            button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-            button.Text = upgradeName .. " Auto-Buy: OFF"
-        end
-    end)
+	button.MouseButton1Click:Connect(function()
+		enabled[action.label] = not enabled[action.label]
+		if enabled[action.label] then
+			button.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+			button.Text = action.label .. " Auto: ON"
+		else
+			button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+			button.Text = action.label .. " Auto: OFF"
+		end
+	end)
 
-    yPos = yPos + 45
+	yPos = yPos + 45
 end
 
--- Auto-buy loop
 task.spawn(function()
-    while true do
-        for _, upgradeName in ipairs(upgrades) do
-            if buyingEnabled[upgradeName] then
-                -- Fire remote event to buy upgrade
-                remote:FireServer("BuyUpgrade", upgradeName)
-            end
-        end
-        task.wait(INTERVAL)
-    end
+	while true do
+		for _, action in ipairs(actions) do
+			if enabled[action.label] then
+				remote:FireServer(unpack(action.args))
+			end
+		end
+		task.wait(INTERVAL)
+	end
 end)
