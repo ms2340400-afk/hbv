@@ -1,93 +1,99 @@
--- Auto Buy / Action UI
+--[[
+    MOG OR DIE — TELEPORT AUTO-FARM
+    Instantly teleports to each collectible (Milk, Hammer, Picture Frame, Water).
+    No walking, no lag — just instant farming.
+]]
+
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = workspace
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local remote = ReplicatedStorage:WaitForChild("NetRemotes"):WaitForChild("Event")
-
-local actions = {
-	{ label = "CashMultiplier", args = {"BuyUpgrade", "CashMultiplier"} },
-	{ label = "AttackRange",    args = {"BuyUpgrade", "AttackRange"} },
-	{ label = "SpawnType",      args = {"BuyUpgrade", "SpawnType"} },
-	{ label = "DoRebirth",      args = {"DoRebirth"} },
+-- ======================== CONFIG ========================
+local targetNames = {
+    "Milk",
+    "Hammer",
+    "Picture Frame",
+    "Water"
 }
 
-local INTERVAL = 1
-local enabled = {}
+local COLLECT_DELAY = 0.15  -- Time between teleports (seconds)
+local MAX_DISTANCE = 500    -- Max distance to teleport
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoBuyUI"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
-
-local frame = Instance.new("Frame")
-frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 240, 0, 200)
-frame.Position = UDim2.new(0.5, -120, 0.5, -100)
-frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
-
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 8)
-uiCorner.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 5)
-title.BackgroundTransparency = 1
-title.Text = "Auto Buy / Actions"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-title.Parent = frame
-
-local yPos = 40
-for _, action in ipairs(actions) do
-	enabled[action.label] = false
-
-	local button = Instance.new("TextButton")
-	button.Name = action.label .. "Button"
-	button.Size = UDim2.new(1, -20, 0, 35)
-	button.Position = UDim2.new(0, 10, 0, yPos)
-	button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-	button.Text = action.label .. " Auto: OFF"
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.TextScaled = true
-	button.Font = Enum.Font.GothamMedium
-	button.AutoButtonColor = false
-	button.Parent = frame
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = button
-
-	button.MouseButton1Click:Connect(function()
-		enabled[action.label] = not enabled[action.label]
-		if enabled[action.label] then
-			button.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-			button.Text = action.label .. " Auto: ON"
-		else
-			button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-			button.Text = action.label .. " Auto: OFF"
-		end
-	end)
-
-	yPos = yPos + 45
+-- ======================== FIND COLLECTIBLES ========================
+local function getCollectibles()
+    local collectibles = {}
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            for _, name in pairs(targetNames) do
+                if obj.Name:lower():match(name:lower()) then
+                    table.insert(collectibles, {
+                        Object = obj,
+                        Position = obj.Position,
+                        Name = obj.Name
+                    })
+                    break
+                end
+            end
+        end
+    end
+    
+    return collectibles
 end
 
-task.spawn(function()
-	while true do
-		for _, action in ipairs(actions) do
-			if enabled[action.label] then
-				remote:FireServer(unpack(action.args))
-			end
-		end
-		task.wait(INTERVAL)
-	end
+-- ======================== TELEPORT COLLECT ========================
+local function teleportCollect()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local collectibles = getCollectibles()
+    local origin = root.Position
+    
+    -- Sort by distance (closest first)
+    table.sort(collectibles, function(a, b)
+        local distA = (origin - a.Position).Magnitude
+        local distB = (origin - b.Position).Magnitude
+        return distA < distB
+    end)
+    
+    -- Teleport to each collectible
+    for _, item in pairs(collectibles) do
+        local dist = (origin - item.Position).Magnitude
+        if dist < MAX_DISTANCE then
+            -- Teleport to the item
+            local teleportPos = item.Position + Vector3.new(0, 3, 0)  -- Slightly above
+            root.CFrame = CFrame.new(teleportPos)
+            
+            -- Wait a tiny moment to register the collection
+            wait(COLLECT_DELAY)
+        end
+    end
+end
+
+-- ======================== LOOP FOREVER ========================
+local function startAutoFarm()
+    while task.wait(0.5) do  -- Run every 0.5 seconds
+        pcall(teleportCollect)
+    end
+end
+
+-- ======================== HOTKEY: T TO COLLECT ONCE ========================
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.T then
+        pcall(teleportCollect)
+        print("✅ Teleport collected!")
+    end
 end)
+
+-- ======================== START FARMING ========================
+task.spawn(startAutoFarm)
+
+print("⚡ MOG OR DIE TELEPORT AUTO-FARM LOADED!")
+print("🎯 Instantly teleports to: Milk, Hammer, Picture Frame, Water")
+print("⌨️ Press T to manually teleport-collect once")
+print("🔄 Auto-farming every 0.5 seconds...")
